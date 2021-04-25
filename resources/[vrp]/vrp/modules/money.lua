@@ -4,23 +4,17 @@ local lang = vRP.lang
 -- The money is managed with direct SQL requests to prevent most potential value corruptions
 -- the wallet empty itself when respawning (after death)
 
-vRP.prepare("vRP/money_tables", [[
-CREATE TABLE IF NOT EXISTS vrp_user_moneys(
-  user_id INTEGER,
-  wallet INTEGER,
-  bank INTEGER,
-  CONSTRAINT pk_user_moneys PRIMARY KEY(user_id),
-  CONSTRAINT fk_user_moneys_users FOREIGN KEY(user_id) REFERENCES vrp_users(id) ON DELETE CASCADE
-);
-]])
-
-vRP.prepare("vRP/money_init_user","INSERT IGNORE INTO vrp_user_moneys(user_id,wallet,bank) VALUES(@user_id,@wallet,@bank)")
-vRP.prepare("vRP/get_money","SELECT wallet,bank FROM vrp_user_moneys WHERE user_id = @user_id")
-vRP.prepare("vRP/set_money","UPDATE vrp_user_moneys SET wallet = @wallet, bank = @bank WHERE user_id = @user_id")
-
 -- init tables
-async(function()
-  vRP.execute("vRP/money_tables")
+Citizen.CreateThread(function()
+  db:execute([[
+    CREATE TABLE IF NOT EXISTS vrp_user_moneys(
+      user_id INTEGER,
+      wallet INTEGER,
+      bank INTEGER,
+      CONSTRAINT pk_user_moneys PRIMARY KEY(user_id),
+      CONSTRAINT fk_user_moneys_users FOREIGN KEY(user_id) REFERENCES vrp_users(id) ON DELETE CASCADE
+    );
+  ]])
 end)
 
 -- load config
@@ -140,11 +134,11 @@ end
 
 -- events, init user account if doesn't exist at connection
 AddEventHandler("vRP:playerJoin",function(user_id,source,name,last_login)
-  vRP.execute("vRP/money_init_user", {user_id = user_id, wallet = cfg.open_wallet, bank = cfg.open_bank})
+  db:execute("INSERT IGNORE INTO vrp_user_moneys(user_id,wallet,bank) VALUES(@user_id,@wallet,@bank)", {user_id = user_id, wallet = cfg.open_wallet, bank = cfg.open_bank})
   -- load money (wallet,bank)
   local tmp = vRP.getUserTmpTable(user_id)
   if tmp then
-    local rows = vRP.query("vRP/get_money", {user_id = user_id})
+    local rows = db:executeSync("SELECT wallet,bank FROM vrp_user_moneys WHERE user_id = @user_id", {user_id = user_id})
     if #rows > 0 then
       tmp.bank = rows[1].bank
       tmp.wallet = rows[1].wallet
@@ -157,7 +151,7 @@ AddEventHandler("vRP:playerLeave",function(user_id,source)
   -- (wallet,bank)
   local tmp = vRP.getUserTmpTable(user_id)
   if tmp and tmp.wallet and tmp.bank then
-    vRP.execute("vRP/set_money", {user_id = user_id, wallet = tmp.wallet, bank = tmp.bank})
+    db:execute("UPDATE vrp_user_moneys SET wallet = @wallet, bank = @bank WHERE user_id = @user_id", {user_id = user_id, wallet = tmp.wallet, bank = tmp.bank})
   end
 end)
 
@@ -165,7 +159,7 @@ end)
 AddEventHandler("vRP:save", function()
   for k,v in pairs(vRP.user_tmp_tables) do
     if v.wallet and v.bank then
-      vRP.execute("vRP/set_money", {user_id = k, wallet = v.wallet, bank = v.bank})
+      db:execute("UPDATE vrp_user_moneys SET wallet = @wallet, bank = @bank WHERE user_id = @user_id", {user_id = k, wallet = v.wallet, bank = v.bank})
     end
   end
 end)
