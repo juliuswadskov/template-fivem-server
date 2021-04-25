@@ -3,7 +3,7 @@ local Tunnel = module("lib/Tunnel")
 local Luang = module("lib/Luang")
 Debug = module("lib/Debug")
 
-db = exports.ghmattimysql
+local db = exports.ghmattimysql
 
 local config = module("cfg/base")
 
