@@ -6,6 +6,8 @@ local cfg = module("cfg/homes")
 
 -- sql
 
+local db = exports.ghmattimysql
+
 -- init
 Citizen.CreateThread(function()
   db:execute([[

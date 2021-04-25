@@ -4,6 +4,8 @@ local lang = vRP.lang
 -- The money is managed with direct SQL requests to prevent most potential value corruptions
 -- the wallet empty itself when respawning (after death)
 
+local db = exports.ghmattimysql
+
 -- init tables
 Citizen.CreateThread(function()
   db:execute([[
