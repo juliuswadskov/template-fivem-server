@@ -1,1 +1,5 @@
 secret.cfg
+cache/
+
+# .Bat Filer der skal ignoreres
+test_start.bat
