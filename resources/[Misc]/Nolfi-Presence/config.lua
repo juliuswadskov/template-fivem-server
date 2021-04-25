@@ -28,6 +28,6 @@ Config.buttons = {
     {
         index = 1,
         name = 'Join Discord',
-        url = "https://discord.gg/6PHWQHSg4T",
+        url = "https://discord.gg/invite",
     },
 }
