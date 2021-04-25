@@ -1,23 +1,15 @@
 -- a basic garage implementation
 
 -- vehicle db
-vRP.prepare("vRP/vehicles_table", [[
-CREATE TABLE IF NOT EXISTS vrp_user_vehicles(
-  user_id INTEGER,
-  vehicle VARCHAR(100),
-  CONSTRAINT pk_user_vehicles PRIMARY KEY(user_id,vehicle),
-  CONSTRAINT fk_user_vehicles_users FOREIGN KEY(user_id) REFERENCES vrp_users(id) ON DELETE CASCADE
-);
-]])
-
-vRP.prepare("vRP/add_vehicle","INSERT IGNORE INTO vrp_user_vehicles(user_id,vehicle) VALUES(@user_id,@vehicle)")
-vRP.prepare("vRP/remove_vehicle","DELETE FROM vrp_user_vehicles WHERE user_id = @user_id AND vehicle = @vehicle")
-vRP.prepare("vRP/get_vehicles","SELECT vehicle FROM vrp_user_vehicles WHERE user_id = @user_id")
-vRP.prepare("vRP/get_vehicle","SELECT vehicle FROM vrp_user_vehicles WHERE user_id = @user_id AND vehicle = @vehicle")
-
--- init
-async(function()
-  vRP.execute("vRP/vehicles_table")
+Citizen.CreateThread(function()
+  db:execute([[
+    CREATE TABLE IF NOT EXISTS vrp_user_vehicles(
+      user_id INTEGER,
+      vehicle VARCHAR(100),
+      CONSTRAINT pk_user_vehicles PRIMARY KEY(user_id,vehicle),
+      CONSTRAINT fk_user_vehicles_users FOREIGN KEY(user_id) REFERENCES vrp_users(id) ON DELETE CASCADE
+    );
+  ]])
 end)
 
 -- load config
@@ -82,7 +74,7 @@ for group,vehicles in pairs(vehicle_groups) do
       end
       
       -- get player owned vehicles
-      local pvehicles = vRP.query("vRP/get_vehicles", {user_id = user_id})
+      local pvehicles = db:executeSync("SELECT vehicle FROM vrp_user_vehicles WHERE user_id = @user_id", {user_id = user_id})
       -- add rents to whitelist
       for k,v in pairs(tmpdata.rent_vehicles) do
         if v then -- check true, prevent future neolua issues
@@ -118,7 +110,7 @@ for group,vehicles in pairs(vehicle_groups) do
           -- buy vehicle
           local vehicle = vehicles[vname]
           if vehicle and vRP.tryPayment(user_id,vehicle[2]) then
-            vRP.execute("vRP/add_vehicle", {user_id = user_id, vehicle = vname})
+            db:execute("INSERT IGNORE INTO vrp_user_vehicles(user_id,vehicle) VALUES(@user_id,@vehicle)", {user_id = user_id, vehicle = vname})
 
             vRPclient._notify(player,lang.money.paid({vehicle[2]}))
             vRP.closeMenu(player)
@@ -129,7 +121,7 @@ for group,vehicles in pairs(vehicle_groups) do
       end
       
       -- get player owned vehicles (indexed by vehicle type name in lower case)
-      local _pvehicles = vRP.query("vRP/get_vehicles", {user_id = user_id})
+      local _pvehicles = db:executeSync("SELECT vehicle FROM vrp_user_vehicles WHERE user_id = @user_id", {user_id = user_id})
       local pvehicles = {}
       for k,v in pairs(_pvehicles) do
         pvehicles[string.lower(v.vehicle)] = true
@@ -166,10 +158,10 @@ for group,vehicles in pairs(vehicle_groups) do
           if vehicle then
             local price = math.ceil(vehicle[2]*cfg.sell_factor)
 
-            local rows = vRP.query("vRP/get_vehicle", {user_id = user_id, vehicle = vname})
+            local rows = db:executeSync("SELECT vehicle FROM vrp_user_vehicles WHERE user_id = @user_id AND vehicle = @vehicle", {user_id = user_id, vehicle = vname})
             if #rows > 0 then -- has vehicle
               vRP.giveMoney(user_id,price)
-              vRP.execute("vRP/remove_vehicle", {user_id = user_id, vehicle = vname})
+              db:execute("DELETE FROM vrp_user_vehicles WHERE user_id = @user_id AND vehicle = @vehicle", {user_id = user_id, vehicle = vname})
 
               vRPclient._notify(player,lang.money.received({price}))
               vRP.closeMenu(player)
@@ -181,7 +173,7 @@ for group,vehicles in pairs(vehicle_groups) do
       end
       
       -- get player owned vehicles (indexed by vehicle type name in lower case)
-      local _pvehicles = vRP.query("vRP/get_vehicles", {user_id = user_id})
+      local _pvehicles = db:executeSync("SELECT vehicle FROM vrp_user_vehicles WHERE user_id = @user_id", {user_id = user_id})
       local pvehicles = {}
       for k,v in pairs(_pvehicles) do
         pvehicles[string.lower(v.vehicle)] = true
@@ -238,7 +230,7 @@ for group,vehicles in pairs(vehicle_groups) do
       end
       
       -- get player owned vehicles (indexed by vehicle type name in lower case)
-      local _pvehicles = vRP.query("vRP/get_vehicles", {user_id = user_id})
+      local _pvehicles = db:executeSync("SELECT vehicle FROM vrp_user_vehicles WHERE user_id = @user_id", {user_id = user_id})
       local pvehicles = {}
       for k,v in pairs(_pvehicles) do
         pvehicles[string.lower(v.vehicle)] = true
