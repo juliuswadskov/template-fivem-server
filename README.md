@@ -1,4 +1,5 @@
 # Template FiveM Server
+Under udvikling (version: 21.4.25)
 
 # Ting du skal gøre før du starter serveren
  - Du skal lave en fil der hedder `secret.cfg` og skrive det her
