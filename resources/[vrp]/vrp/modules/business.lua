@@ -8,43 +8,33 @@ local lang = vRP.lang
 local sanitizes = module("cfg/sanitizes")
 
 -- sql
-vRP.prepare("vRP/business_tables",[[
-CREATE TABLE IF NOT EXISTS vrp_user_business(
-  user_id INTEGER,
-  name VARCHAR(30),
-  description TEXT,
-  capital INTEGER,
-  laundered INTEGER,
-  reset_timestamp INTEGER,
-  CONSTRAINT pk_user_business PRIMARY KEY(user_id),
-  CONSTRAINT fk_user_business_users FOREIGN KEY(user_id) REFERENCES vrp_users(id) ON DELETE CASCADE
-);
-]])
-
-vRP.prepare("vRP/create_business","INSERT IGNORE INTO vrp_user_business(user_id,name,description,capital,laundered,reset_timestamp) VALUES(@user_id,@name,'',@capital,0,@time)")
-vRP.prepare("vRP/delete_business","DELETE FROM vrp_user_business WHERE user_id = @user_id")
-vRP.prepare("vRP/get_business","SELECT name,description,capital,laundered,reset_timestamp FROM vrp_user_business WHERE user_id = @user_id")
-vRP.prepare("vRP/add_capital","UPDATE vrp_user_business SET capital = capital + @capital WHERE user_id = @user_id")
-vRP.prepare("vRP/add_laundered","UPDATE vrp_user_business SET laundered = laundered + @laundered WHERE user_id = @user_id")
-vRP.prepare("vRP/get_business_page","SELECT user_id,name,description,capital FROM vrp_user_business ORDER BY capital DESC LIMIT @b,@n")
-vRP.prepare("vRP/reset_transfer","UPDATE vrp_user_business SET laundered = 0, reset_timestamp = @time WHERE user_id = @user_id")
 
 -- init
-async(function()
-vRP.execute("vRP/business_tables")
+Citizen.CreateThread(function()
+  db:execute([[
+    CREATE TABLE IF NOT EXISTS vrp_user_business(
+      user_id INTEGER,
+      name VARCHAR(30),
+      description TEXT,
+      capital INTEGER,
+      laundered INTEGER,
+      reset_timestamp INTEGER,
+      CONSTRAINT pk_user_business PRIMARY KEY(user_id),
+      CONSTRAINT fk_user_business_users FOREIGN KEY(user_id) REFERENCES vrp_users(id) ON DELETE CASCADE
+    );
+  ]])
 end)
 
 -- api
-
 -- return user business data or nil
 function vRP.getUserBusiness(user_id, cbr)
   if user_id then
-    local rows = vRP.query("vRP/get_business", {user_id = user_id})
+    local rows = db:executeSync("SELECT name,description,capital,laundered,reset_timestamp FROM vrp_user_business WHERE user_id = @user_id", {user_id = user_id})
     local business = rows[1]
 
     -- when a business is fetched from the database, check for update of the laundered capital transfer capacity
     if business and os.time() >= business.reset_timestamp+cfg.transfer_reset_interval*60 then
-      vRP.execute("vRP/reset_transfer", {user_id = user_id, time = os.time()})
+      db:execute("UPDATE vrp_user_business SET laundered = 0, reset_timestamp = @time WHERE user_id = @user_id", {user_id = user_id, time = os.time()})
       business.laundered = 0
     end
 
@@ -54,7 +44,7 @@ end
 
 -- close the business of an user
 function vRP.closeBusiness(user_id)
-  vRP.execute("vRP/delete_business", {user_id = user_id})
+  db:execute("DELETE FROM vrp_user_business WHERE user_id = @user_id", {user_id = user_id})
 end
 
 -- business interaction
@@ -65,7 +55,7 @@ local function open_business_directory(player,page) -- open business directory w
 
   local menu = {name=lang.business.directory.title().." ("..page..")",css={top="75px",header_color="rgba(240,203,88,0.75)"}}
 
-  local rows = vRP.query("vRP/get_business_page", {b = page*10, n = 10})
+  local rows = db:executeSync("SELECT user_id,name,description,capital FROM vrp_user_business ORDER BY capital DESC LIMIT @b,@n", {b = page*10, n = 10})
   local count = 0
   for k,v in pairs(rows) do
     count = count+1
@@ -110,7 +100,7 @@ local function business_enter(source)
         amount = parseInt(amount)
         if amount > 0 then
           if vRP.tryPayment(user_id,amount) then
-            vRP.execute("vRP/add_capital", {user_id = user_id, capital = amount})
+            db:execute("UPDATE vrp_user_business SET capital = capital + @capital WHERE user_id = @user_id", {user_id = user_id, capital = amount})
             vRPclient._notify(player,lang.business.addcapital.added({amount}))
           else
             vRPclient._notify(player,lang.money.not_enough())
@@ -129,7 +119,7 @@ local function business_enter(source)
         if amount > 0 and amount <= launder_left then
           if vRP.tryGetInventoryItem(user_id,"dirty_money",amount,false) then
             -- add laundered amount
-            vRP.execute("vRP/add_laundered", {user_id = user_id, laundered = amount})
+            db:execute("UPDATE vrp_user_business SET laundered = laundered + @laundered WHERE user_id = @user_id", {user_id = user_id, laundered = amount})
             -- give laundered money
             vRP.giveMoney(user_id,amount)
             vRPclient._notify(player,lang.business.launder.laundered({amount}))
@@ -149,7 +139,7 @@ local function business_enter(source)
           capital = parseInt(capital)
           if capital >= cfg.minimum_capital then
             if vRP.tryPayment(user_id,capital) then
-              vRP.execute("vRP/create_business", {
+              db:execute("INSERT IGNORE INTO vrp_user_business(user_id,name,description,capital,laundered,reset_timestamp) VALUES(@user_id,@name,'',@capital,0,@time)", {
                 user_id = user_id,
                 name = name,
                 capital = capital,
