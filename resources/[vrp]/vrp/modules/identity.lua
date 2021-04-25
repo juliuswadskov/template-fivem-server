@@ -7,6 +7,8 @@ local sanitizes = module("cfg/sanitizes")
 
 -- this module describe the identity system
 
+local db = exports.ghmattimysql
+
 -- init sql
 Citizen.CreateThread(function()
   db:execute([[
