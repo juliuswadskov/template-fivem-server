@@ -9,6 +9,8 @@ local sanitizes = module("cfg/sanitizes")
 
 -- sql
 
+local db = exports.ghmattimysql
+
 -- init
 Citizen.CreateThread(function()
   db:execute([[

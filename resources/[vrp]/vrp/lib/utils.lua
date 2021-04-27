@@ -16,6 +16,7 @@ function table.maxn(t)
 end
 
 local modules = {}
+
 -- load a lua resource file as module
 -- rsc: resource name
 -- path: lua file path without extension

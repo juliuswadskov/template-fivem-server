@@ -1,6 +1,9 @@
 -- a basic garage implementation
 
 -- vehicle db
+
+local db = exports.ghmattimysql
+
 Citizen.CreateThread(function()
   db:execute([[
     CREATE TABLE IF NOT EXISTS vrp_user_vehicles(
